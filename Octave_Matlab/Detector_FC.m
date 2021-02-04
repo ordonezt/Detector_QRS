@@ -74,10 +74,11 @@ X3 = X2.*X2;
 
 %Recorro la señal buscando el maximo y empiezo a detectar
 tamanio_bloque = 10;
-maximo_tom = 1;
+maximo_tom = 0;
 envolvente = maximo_tom;
 tiempo_de_maximo = 0;
 D = 0.003;
+umbral_minimo = 0.005;
 envolvente_vector = zeros(1,length(X3));
 pulsos_vector = zeros(1,length(X3));
 bloquear_deteccion = false;
@@ -104,7 +105,7 @@ for i=1:(length(X3)-tamanio_bloque)
   for indice_individual=1:tamanio_bloque
     
     %Estamos en un maximo?
-    if senial_bloque(indice_individual) >= envolvente
+    if (senial_bloque(indice_individual) >= envolvente) && (senial_bloque(indice_individual) > umbral_minimo)
       %Guardo el maximo
       maximo_tom = senial_bloque(indice_individual);
       %Arranco la envolvente pegada al maximo y reinicio su tiempo
@@ -192,6 +193,7 @@ hold on;
 plot(pulsos_vector);
 hold off;
 
+frecuencia = frecuencia_promediada;
 ##%Integro
 ##windowSize = 16; 
 ##b = (1/windowSize)*ones(1,windowSize);
