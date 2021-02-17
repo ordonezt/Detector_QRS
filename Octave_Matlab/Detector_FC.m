@@ -87,9 +87,13 @@ indice_global_anterior = 0;
 delta_indice = 0;
 contador_muestra_2ms = 0;
 contador_timeout_frecuencia = 0;
-cantidad_promedios = 0;
+cantidad_promedios = 1;
 cantidad_promedios_maxima = 10;
 vector_frecuencias_promedio = zeros(1, cantidad_promedios_maxima);
+vector_frecuencias_anteriores = zeros(1, 2);
+flag_pulso = false;
+indice_pulso = 0;
+indice_pulso_anterior = 0;
 for i=1:(length(X3)-tamanio_bloque)
   
   %Obtego un bloque de la señal
@@ -126,13 +130,21 @@ for i=1:(length(X3)-tamanio_bloque)
         %Si es la primera deteccion no la cuento para el calculo de frecuencia
         if indice_global_anterior == 0
           delta_indice = 0;
-          cantidad_promedios = 0;
+          cantidad_promedios = 1;
         end
         indice_global_anterior = indice_global;
+        
+        flag_pulso = true;
+        indice_pulso = indice_global;
       end
     else
       %Decremento la envolvente
+      %Hiperbolica
       envolvente = maximo_tom / (1 + D * tiempo_de_maximo);
+##      %Exponencial
+##      envolvente = maximo_tom * exp(-0.000767 * tiempo_de_maximo);
+##      %Armonica
+##      envolvente = maximo_tom / ((1 + 0.2 * D * tiempo_de_maximo) ^ (1/0.2));
     end
     
     %Incremento el tiempo para la envolvente
@@ -152,7 +164,7 @@ for i=1:(length(X3)-tamanio_bloque)
     %Si pasaron 2 segundos bajo la cantidad de promedios
     if (contador_muestra_2ms - contador_timeout_frecuencia) >= (2*Fsp)
       contador_timeout_frecuencia = contador_muestra_2ms;
-      if cantidad_promedios != 0
+      if cantidad_promedios != 1
         cantidad_promedios -= 1;
       end
     end
@@ -160,16 +172,34 @@ for i=1:(length(X3)-tamanio_bloque)
     contador_muestra_2ms += 1;
   end
   
-  if delta_indice != 0
-    frecuencia_cardiaca_actual = 60 * Fsp / delta_indice;
-    vector_frecuencias_promedio = [frecuencia_cardiaca_actual, vector_frecuencias_promedio(1:end-1)];
-    frecuencia_promediada = mean(vector_frecuencias_promedio(1:cantidad_promedios))
-    delta_indice = 0;
-    vector_grafico_frecuencias((i-1)*tamanio_bloque) = frecuencia_promediada;
+##  if delta_indice != 0
+##    frecuencia_cardiaca_actual = 60 * Fsp / delta_indice;
+##    vector_frecuencias_promedio = [frecuencia_cardiaca_actual, vector_frecuencias_promedio(1:end-1)];
+##    frecuencia_promediada = mean(vector_frecuencias_promedio(1:cantidad_promedios))
+##    delta_indice = 0;
+##    vector_grafico_frecuencias((i-1)*tamanio_bloque) = frecuencia_promediada;
+##  end
+  
+  if flag_pulso == true
+##    timeout_fc = tiempo_timeout_fc;
+    %Evito el primer pulso para el calculo
+    if indice_pulso_anterior == 0
+      indice_pulso_anterior = indice_pulso;
+    end
+    periodo_muestras = indice_pulso - indice_pulso_anterior;
+    indice_pulso_anterior = indice_pulso;
+    
+    if periodo_muestras != 0
+      frecuencia_cardiaca_actual = 60 * Fsp / periodo_muestras;
+      vector_frecuencias_anteriores = [frecuencia_cardiaca_actual, vector_frecuencias_anteriores(1:end-1)];
+      if (frecuencia_cardiaca_actual > (0.8 * mean(vector_frecuencias_anteriores))) && (frecuencia_cardiaca_actual < (1.2 * mean(vector_frecuencias_anteriores)))
+        vector_frecuencias_promedio = [frecuencia_cardiaca_actual, vector_frecuencias_promedio(1:end-1)]
+      end
+      cantidad_promedios
+      frecuencia_promediada = mean(vector_frecuencias_promedio(1:cantidad_promedios-1))
+      vector_grafico_frecuencias((i-1)*tamanio_bloque) = frecuencia_promediada;
+    end
   end
-  
-  
-  
 end #for
 
 figure();
