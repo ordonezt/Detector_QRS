@@ -1,5 +1,5 @@
 function [frecuencia]=Detector_FC(vectorInput, frecuencia)
-%Frecuencia = frecuencia de muestreo de la señal
+%Frecuencia = frecuencia de muestreo de la senial
 
 Fsp=500;    %Frecuencia de resampleo
 Fs=frecuencia;
@@ -12,8 +12,8 @@ else
     vector=vectorInput;
 end
 vector_crudo=vector;
-%%Adaptacion de señal
-%Aca lo que hago es ajustar la señal a lo que leeemos del ADC
+%%Adaptacion de senial
+%Aca lo que hago es ajustar la senial a lo que leeemos del ADC
 constanteAtenuacion = 2.2e-3;
 vector = vector *constanteAtenuacion;
 amplificacion = 240;
@@ -72,7 +72,7 @@ X2 = X1 / 0.1;
 %Elevo al cuadrado
 X3 = X2.*X2;
 
-%Recorro la señal buscando el maximo y empiezo a detectar
+%Recorro la senial buscando el maximo y empiezo a detectar
 tamanio_bloque = 10;
 maximo_tom = 0;
 envolvente = maximo_tom;
@@ -96,7 +96,7 @@ indice_pulso = 0;
 indice_pulso_anterior = 0;
 for i=1:(length(X3)-tamanio_bloque)
   
-  %Obtego un bloque de la señal
+  %Obtego un bloque de la senial
   inicio = 1 + tamanio_bloque*(i-1);
   fin = 1 + tamanio_bloque*(i-1) + tamanio_bloque;
   if inicio>length(X3) || fin>length(X3)
