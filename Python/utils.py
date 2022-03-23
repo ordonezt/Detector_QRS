@@ -5,7 +5,9 @@ Created on Fri Mar 18 14:37:37 2022
 @author: tomaso
 """
 from scipy.signal import sosfilt, tf2sos
+from scipy.signal.windows import triang
 import pandas as pd
+import numpy as np
 
 def filtrar(entrada, filtro, zi=None):
     # salida, zf = sosfilt(sos=filtro, x=entrada, zi=zi)
@@ -28,4 +30,34 @@ def importar_filtro(archivo):
     sos = tf2sos(b, a)
     
     return sos
+
+def escalar_senial(dato, ganancia_ecg, ganancia_ads):
+    return dato * ganancia_ecg / ganancia_ads
+
+def declinacion_hiperbolica(q0, D, n):
+    return q0 / (1 + D*n)
+
+def agregar_pulso(senial, duracion, amplitud, posicion, FS):
+    M = int(duracion * FS)
+    pulso = amplitud * triang(M)
+    aux = np.delete(senial, np.s_[posicion : posicion + M])
     
+    return np.insert(aux, posicion, pulso)
+
+def importar_senial_octave(archivo):
+    #Abro el archivo
+    csv = pd.read_csv(archivo, usecols=[0], names=['senial'], header=None)
+    
+    #Obtengo la senial
+    senial = csv['senial']
+    
+    return np.array(senial)
+
+def agregar_y_desplazar(vector, dato, cantidad):
+    if len(vector) >= cantidad:
+        vector.pop(0)
+    vector.append(dato)
+    return vector
+
+def promedio(vector):
+    return np.average(vector)
