@@ -4,7 +4,7 @@ Created on Fri Mar 18 14:37:37 2022
 
 @author: tomaso
 """
-from scipy.signal import sosfilt, tf2sos
+from scipy.signal import sosfilt, tf2sos, lfilter_zi
 from scipy.signal.windows import triang
 import pandas as pd
 import numpy as np
@@ -29,7 +29,10 @@ def importar_filtro(archivo):
     #Obtengo el filtro en formato S.O.S.
     sos = tf2sos(b, a)
     
-    return sos
+    b = b.to_numpy()
+    a = a.to_numpy()
+    
+    return sos, b, a
 
 def escalar_senial(dato, ganancia_ecg, ganancia_ads):
     return dato * ganancia_ecg / ganancia_ads
