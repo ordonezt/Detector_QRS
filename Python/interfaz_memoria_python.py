@@ -6,6 +6,7 @@ Created on Fri Apr 16 12:32:20 2021
 @author: ord
 """
 import numpy as np
+import struct
 # =============================================================================
 # function array = memoria2array_int16(ruta_archivo)
 #     %Abrimos el archivo para lectura
@@ -58,9 +59,34 @@ def memoria2array_int16(ruta_archivo):
                 for MSB, LSB in zip(bytes_MSB, bytes_LSB):
                     #print(MSB + LSB)
                     dato = complemento_a_dos(MSB + LSB, 16)
-                    print(dato)
+                    # print(dato)
                     senial = np.append(senial, dato)
     except:
         print('Pone bien la ruta del archivo!!')
+        
+    return senial
+
+def memoria2array_float32(ruta_archivo):
+    senial = np.array([])
+    
+    #Abrimos el archivo para lectura
+    #try:
+    with open(ruta_archivo, 'r') as archivo:
+        for linea in archivo:
+            vector_bytes = linea.split()
+            
+            bytes_B3 = vector_bytes[3::4]
+            bytes_B2 = vector_bytes[2::4]
+            bytes_B1 = vector_bytes[1::4]
+            bytes_B0 = vector_bytes[0::4]
+            
+            for B3, B2, B1, B0 in zip(bytes_B3, bytes_B2, bytes_B1, bytes_B0):
+                # print(B3 + B2 + B1 + B0)
+                dato = struct.unpack('!f', bytes.fromhex(B3 + B2 + B1 + B0))[0]
+                
+                # print(dato)
+                senial = np.append(senial, dato)
+    # except:
+    #     print('Pone bien la ruta del archivo!!')
         
     return senial
