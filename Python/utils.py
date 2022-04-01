@@ -19,18 +19,26 @@ def filtrar(entrada, filtro, zi=None):
         return salida
 
 def importar_filtro(archivo):
-    #Abro el archivo
-    csv = pd.read_csv(archivo, usecols=[0,1], names=['b', 'a'], header=None)
-    
-    #Obtengo numerador y denominador
-    a = csv['a']
-    b = csv['b']
-    
+    try:
+        #Abro el archivo
+        csv = pd.read_csv(archivo, usecols=[0,1], names=['b', 'a'], header=None)
+        
+        #Obtengo numerador y denominador
+        a = csv['a']
+        b = csv['b']
+        b = b.to_numpy()
+        a = a.to_numpy()
+    except:
+        #Abro el archivo
+        csv = pd.read_csv(archivo, usecols=[0], names=['b'], header=None)
+        
+        #Obtengo numerador y denominador
+        a = np.array((1.0))
+        b = csv['b']
+        b = b.to_numpy()
+        
     #Obtengo el filtro en formato S.O.S.
     sos = tf2sos(b, a)
-    
-    b = b.to_numpy()
-    a = a.to_numpy()
     
     return sos, b, a
 
