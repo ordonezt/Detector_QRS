@@ -15,8 +15,8 @@ from scipy.fft import fft, fftfreq
 from scipy.signal import bode
 import mplcursors
 
-senial_path = 'Signals_ADS/R_wave_250ppm_05mV_120ms'
-senial_micro_path = 'Signals_ADS/micro_R_wave_250ppm_05mV_120ms'
+senial_path = 'Signals_ADS/NS_250_1mV.txt'
+senial_micro_path = 'Signals_ADS/micro_NS_240_05mV'
 filtro_qrs_path = 'C:/Users/tomaso/Documents/Repositorios/PE1901_ADS1194/Docs/Filtros/Filtro_diferenciador_QRS3_IIR.csv'
 filtro_pasa_altos_path = 'C:/Users/tomaso/Documents/Repositorios/PE1901_ADS1194/Docs/Filtros/Filtro_pasa_altos_2Hz_IIR.csv'
 filtro_notch_path = 0
@@ -26,8 +26,9 @@ TAMANIO_BLOQUE_FILTRADO = 5
 UMBRAL_MINIMO = 5000#50#1e-6
 GANANCIA_ADS = 1
 CTE_HIPERBOLICA = 0.012#0.024#0.006
-PERIODO_REFRACTARIO = 0.12 * FS
+PERIODO_REFRACTARIO = int(200e-3 * FS)
 PERIODO_VALIDACION = int(30e-3 * FS)
+PERIODO_BUSQUEDA = int(50e-3 * FS)
 CANT_PROMEDIOS = 10
 
 #Variables globales
@@ -40,7 +41,11 @@ indice_global = 0           #Tiene el numero de muestra actual sobre el total
 indice_maximo_local = 0
 deteccion_bloqueada = 0
 contador_muestras_validas = 0
+intervalo_entre_pulsos = 0
 vector_integral = []
+muestras_desde_maximo = 0
+buscando_maximo_flag = False
+contador_muestras_maximo = 0
 
 #Señales auxiliares
 senial_filtrada_final = []
@@ -82,6 +87,8 @@ longitud_total = len(senial_entrada)
 
 #Creo un vector de eventos de pulsos
 vector_pulsos = np.zeros(longitud_total)
+
+vector_buscando_maximo = np.zeros(longitud_total)
 
 #Indice para retirar bloques de señal
 indice_extraccion = 0
@@ -130,12 +137,31 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
             dato = promedio(vector_integral)
             senial_integrada_final = np.append(senial_integrada_final, dato)
             
+            if buscando_maximo_flag == True:
+                contador_muestras_maximo = contador_muestras_maximo + 1
+                vector_buscando_maximo[indice_global] = 250000
+                if dato > maximo_local: #and deteccion_bloqueada == 0:
+                    maximo_local = dato
+                    indice_maximo_local = indice_global      
+                    
+                if contador_muestras_maximo > PERIODO_BUSQUEDA:
+                    buscando_maximo_flag = False
+                    contador_muestras_maximo = 0
+                    maximo = maximo_local
+                    maximo_local = 0
+                    muestras_desde_contacto = indice_global - indice_maximo_local
+                    vector_pulsos[indice_maximo_local] = senial_entrada[indice_maximo_local]
+                    print(maximo)
+            else:
+                contador_muestras_maximo = 0
+                
             #Vemos si supera el umbral de deteccion
             if dato > umbral:
                 
-                if dato > maximo_local and deteccion_bloqueada == 0:
+                    
+                if dato > maximo_local: #and deteccion_bloqueada == 0:
                     maximo_local = dato
-                    indice_maximo_local = indice_global
+                    indice_maximo_local = indice_global      
                 
                 #Contamos la cantidad de muestras encima del umbral
                 contador_muestras_validas = contador_muestras_validas + 1
@@ -147,13 +173,15 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
                     if deteccion_bloqueada == 0:
                         
                         #Reiniciamos el tiempo de la envolvente
-                        muestras_desde_contacto = indice_global - indice_maximo_local#0
-                        maximo = maximo_local
-                        maximo_local = 0
+                        # muestras_desde_contacto = indice_global - indice_maximo_local#0
+                        # maximo = maximo_local
+                        # maximo_local = 0
+                        buscando_maximo_flag = True
                         
-                        #print(muestras_desde_contacto)
+                        # print(intervalo_entre_pulsos - muestras_desde_contacto)
+                        # intervalo_entre_pulsos = 0
                         #Graficamos la deteccion
-                        vector_pulsos[indice_global] = senial_entrada[indice_global]
+                        # vector_pulsos[indice_global] = senial_entrada[indice_global]
                         # print(indice_global)
                         
                         #Bloqueamos la deteccion durante el periodo refractario
@@ -169,6 +197,10 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
                 #Si no supero el umbral invalidamos el pulso
                 if contador_muestras_validas > 0:
                     contador_muestras_validas = contador_muestras_validas - 1
+                # else:
+                #     maximo_local = 0
+                #     vector_buscando_maximo[indice_global] = -10000
+                    
                 
                 #Calculamos el umbral
                 umbral = declinacion_hiperbolica(maximo, CTE_HIPERBOLICA, muestras_desde_contacto)
@@ -180,6 +212,10 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
             #Incrementamos el tiempo total
             indice_global = indice_global + 1
             
+            intervalo_entre_pulsos = intervalo_entre_pulsos + 1
+            
+            muestras_desde_maximo = muestras_desde_maximo + 1
+            
             #Decrementamos el delay de deteccion bloqueada
             if deteccion_bloqueada > 0:
                 deteccion_bloqueada = deteccion_bloqueada - 1
@@ -187,6 +223,9 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
             #Preparo vectores para graficar
             senial_umbral = np.append(senial_umbral, umbral)
             senial_maximo = np.append(senial_maximo, maximo)
+            
+            # if contador_muestras_validas != 0:
+            #     print(contador_muestras_validas)
 
 
 senial_filtrada = filtrar(senial_entrada, filtro)
@@ -200,6 +239,7 @@ ax0.plot(senial_umbral, label='umbral')
 ax0.plot(senial_integrada_final, label='integrada')
 #ax0.stem(vector_pulsos, label='pulsos', markerfmt='-')
 ax0.plot(senial_micro, label='micro')
+ax0.plot(vector_buscando_maximo, label='buscando')
 ax1.stem(vector_pulsos, label='pulsos', markerfmt='-')
 
 fft_original = fft(senial_entrada)
