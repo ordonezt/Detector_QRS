@@ -13,17 +13,19 @@ declinacion_hiperbolica, importar_senial_octave, agregar_y_desplazar, promedio
 import numpy as np
 from scipy.fft import fft, fftfreq
 from scipy.signal import bode
+import mplcursors
 
-senial_path = 'Signals_ADS/R_wave_60ppm_05mV_120ms'
-filtro_qrs_path = 'C:/Users/tomaso/Documents/Repositorios/PE1901_ADS1194/Docs/Filtros/Filtro_diferenciador_QRS2_IIR.csv'
+senial_path = 'Signals_ADS/R_wave_250ppm_05mV_120ms'
+senial_micro_path = 'Signals_ADS/micro_R_wave_250ppm_05mV_120ms'
+filtro_qrs_path = 'C:/Users/tomaso/Documents/Repositorios/PE1901_ADS1194/Docs/Filtros/Filtro_diferenciador_QRS3_IIR.csv'
 filtro_pasa_altos_path = 'C:/Users/tomaso/Documents/Repositorios/PE1901_ADS1194/Docs/Filtros/Filtro_pasa_altos_2Hz_IIR.csv'
 filtro_notch_path = 0
 #Definicion de parametros
 FS = 500
 TAMANIO_BLOQUE_FILTRADO = 5
-UMBRAL_MINIMO = 50#1e-6
+UMBRAL_MINIMO = 5000#50#1e-6
 GANANCIA_ADS = 1
-CTE_HIPERBOLICA = 0.006#0.024#
+CTE_HIPERBOLICA = 0.012#0.024#0.006
 PERIODO_REFRACTARIO = 0.12 * FS
 PERIODO_VALIDACION = int(30e-3 * FS)
 CANT_PROMEDIOS = 10
@@ -66,6 +68,7 @@ zi_hp = np.zeros((1,2))
 
 #Importar una señal
 senial_entrada = m2p.memoria2array_int16(senial_path)
+senial_micro = m2p.memoria2array_float32(senial_micro_path)
 #senial_entrada = importar_senial_octave(senial_path)
 
 # senial_filtrada = filtrar(senial_entrada, filtro)
@@ -97,7 +100,7 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
         if deteccion_bloqueada < 0:
             deteccion_bloqueada = 0
     else:
-        if indice_global == 400:
+        if indice_global == 550:
             maximo = 0
             umbral = UMBRAL_MINIMO
             
@@ -130,7 +133,7 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
             #Vemos si supera el umbral de deteccion
             if dato > umbral:
                 
-                if dato > maximo_local:
+                if dato > maximo_local and deteccion_bloqueada == 0:
                     maximo_local = dato
                     indice_maximo_local = indice_global
                 
@@ -148,6 +151,7 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
                         maximo = maximo_local
                         maximo_local = 0
                         
+                        #print(muestras_desde_contacto)
                         #Graficamos la deteccion
                         vector_pulsos[indice_global] = senial_entrada[indice_global]
                         # print(indice_global)
@@ -163,7 +167,8 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
                         pass
             else:
                 #Si no supero el umbral invalidamos el pulso
-                contador_muestras_validas = 0
+                if contador_muestras_validas > 0:
+                    contador_muestras_validas = contador_muestras_validas - 1
                 
                 #Calculamos el umbral
                 umbral = declinacion_hiperbolica(maximo, CTE_HIPERBOLICA, muestras_desde_contacto)
@@ -188,12 +193,13 @@ senial_filtrada = filtrar(senial_entrada, filtro)
 fig0, [ax0, ax1, ax2] = plt.subplots(3,1)
 #ax0.plot(senial_entrada, label='entrada')
 ax1.plot(senial_entrada, label='entrada')
-ax0.plot(senial_filtrada_final, label='filtrada')
+#ax0.plot(senial_filtrada_final, label='filtrada')
 #ax0.plot(senial_cuadrada_final, label='cuadrada')
 ax0.plot(senial_umbral, label='umbral')
 #ax0.plot(senial_maximo, label='maximo')
 ax0.plot(senial_integrada_final, label='integrada')
 #ax0.stem(vector_pulsos, label='pulsos', markerfmt='-')
+ax0.plot(senial_micro, label='micro')
 ax1.stem(vector_pulsos, label='pulsos', markerfmt='-')
 
 fft_original = fft(senial_entrada)
@@ -205,7 +211,19 @@ w, mag, phase = bode((b, a), w=freq)
 ax2.plot(freq, 2.0/N * np.abs(fft_original[0:N//2]), label='entrada')
 ax2.plot(w, mag, label='filtro')
 
-fig0.suptitle(senial_path[-15:])
+fig0.suptitle(senial_path.split(sep='/')[-1] + '\n' + filtro_qrs_path.split(sep='/')[-1])
 ax0.legend()
 ax1.legend()
 ax2.legend()
+
+ax0.set_title('Procesamiento')
+ax1.set_title('Resultados')
+ax2.set_title('Espectro')
+
+ax0.grid(True)
+ax1.grid(True)
+ax2.grid(True)
+
+mplcursors.cursor()
+
+plt.show()
