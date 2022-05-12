@@ -14,21 +14,22 @@ import numpy as np
 from scipy.fft import fft, fftfreq
 from scipy.signal import bode
 import mplcursors
+from scipy.signal import filtfilt
 
-senial_path = 'Signals_ADS/N_sinus_20ppm_1mV'
-senial_micro_path = 'Signals_ADS/N_sinus_20ppm_1mV_micro'
-senial_umbral_path = 'Signals_ADS/N_sinus_20ppm_1mV_umbral'
-filtro_qrs_path = 'C:/Users/tomaso/Documents/Repositorios/PE1901_ADS1194/Docs/Filtros/Filtro_diferenciador_QRS3_IIR.csv'
+senial_path = 'Signals_ADS/R_wave_60ppm_1mV_10ms'
+senial_micro_path = 'Signals_ADS/R_wave_60ppm_05mV_80ms_micro'
+senial_umbral_path = 'Signals_ADS/R_wave_60ppm_05mV_80ms_umbral'
+filtro_qrs_path = 'C:/Users/tomaso/Documents/Repositorios/PE1901_ADS1194/Docs/Filtros/Filtro_diferenciador_QRS_IIR.csv'
 filtro_pasa_altos_path = 'C:/Users/tomaso/Documents/Repositorios/PE1901_ADS1194/Docs/Filtros/Filtro_pasa_altos_2Hz_IIR.csv'
 filtro_notch_path = 0
 #Definicion de parametros
 FS = 500
 TAMANIO_BLOQUE_FILTRADO = 5
-UMBRAL_MINIMO = 5000#50#1e-6
+UMBRAL_MINIMO = 20000#5000#50#1e-6
 GANANCIA_ADS = 1
 CTE_HIPERBOLICA = 0.012#0.024#0.006
 PERIODO_REFRACTARIO = int(130e-3 * FS)
-PERIODO_VALIDACION = int(30e-3 * FS)
+PERIODO_VALIDACION = int(10e-3 * FS)
 PERIODO_BUSQUEDA = int(50e-3 * FS)
 CANT_PROMEDIOS = 10
 
@@ -85,6 +86,20 @@ senial_umbral_micro = m2p.memoria2array_float32(senial_umbral_path)
 # ax0.plot(senial_entrada, label='entrada')
 # ax0.plot(senial_filtrada, label='salida')
 # ax0.legend()
+
+#Filtrarla
+#Sacamos la continua
+senial_filtrada_offline = filtfilt(b_hp, a_hp, senial_entrada)
+#Convertimos a entero, como esta en el micro
+senial_filtrada_offline = senial_filtrada_offline.astype(int)
+#Amplificamos
+senial_filtrada_offline = 10 * senial_filtrada_offline
+#Derivamos y sacamos ruido
+senial_filtrada_offline = filtfilt(b, a, senial_filtrada_offline)
+#Convertimos a entero, como esta en el micro
+senial_filtrada_offline = senial_filtrada_offline.astype(int)
+senial_filtrada_offline = senial_filtrada_offline ** 2
+
 
 longitud_total = len(senial_entrada)
 
@@ -247,15 +262,16 @@ fig0, [ax0, ax1, ax2] = plt.subplots(3,1)
 ax1.plot(senial_entrada, label='entrada')
 #ax0.plot(senial_filtrada_final, label='filtrada')
 #ax0.plot(senial_cuadrada_final, label='cuadrada')
-# ax0.plot(senial_bloqueo, label='bloqueo')
+#ax0.plot(senial_bloqueo, label='bloqueo')
 ax0.plot(senial_umbral, label='umbral')
 #ax0.plot(senial_maximo, label='maximo')
+ax0.plot(senial_filtrada_offline, label='offline')
 ax0.plot(senial_integrada_final, label='integrada')
-ax0.stem(vector_maximos, label='maximos', markerfmt='-')
+# ax0.stem(vector_maximos, label='maximos', markerfmt='-')
 #ax0.stem(vector_pulsos, label='pulsos', markerfmt='-')
-#ax0.plot(senial_micro, label='micro')
-#ax0.plot(senial_umbral_micro, label='umbral micro')
-ax0.plot(vector_buscando_maximo, label='buscando')
+# ax0.plot(senial_micro, label='micro')
+# ax0.plot(senial_umbral_micro, label='umbral micro')
+#ax0.plot(vector_buscando_maximo, label='buscando')
 ax1.stem(vector_pulsos, label='pulsos', markerfmt='-')
 
 fft_original = fft(senial_entrada)
