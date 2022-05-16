@@ -9,6 +9,7 @@ aptas para la libreria de ARM CMSIS
 """
 
 from scipy import signal
+from utils import importar_filtro
 
 def filtro2sos(b, a):
     
@@ -25,3 +26,8 @@ def filtro2sos(b, a):
                 print('a{:1}{:1} = {:1.20f}'.format(i, j-3, secciones[i,j]))
             else:
                 print('a{:1}{:1} = {:1.20f}'.format(i, j-3, secciones[i,j]))
+
+def archivo2sos(path):
+    sos, b, a = importar_filtro(path)
+    filtro2sos(b, a)
+    

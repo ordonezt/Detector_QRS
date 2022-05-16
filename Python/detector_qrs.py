@@ -14,18 +14,18 @@ import numpy as np
 from scipy.fft import fft, fftfreq
 from scipy.signal import bode
 import mplcursors
-from scipy.signal import filtfilt
+from scipy.signal import filtfilt, lfilter
 
-senial_path = 'Signals_ADS/R_wave_60ppm_1mV_10ms'
+senial_path = 'Signals_ADS/N_sinus_20ppm_1mV'
 senial_micro_path = 'Signals_ADS/R_wave_60ppm_05mV_80ms_micro'
 senial_umbral_path = 'Signals_ADS/R_wave_60ppm_05mV_80ms_umbral'
-filtro_qrs_path = 'C:/Users/tomaso/Documents/Repositorios/PE1901_ADS1194/Docs/Filtros/Filtro_diferenciador_QRS_IIR.csv'
-filtro_pasa_altos_path = 'C:/Users/tomaso/Documents/Repositorios/PE1901_ADS1194/Docs/Filtros/Filtro_pasa_altos_2Hz_IIR.csv'
+filtro_qrs_path = 'Filtros/Diferenciador_FIR_orden3.csv'
+filtro_pasa_altos_path = 'Filtros/Filtro_diferenciador_QRS_IIR.csv'
 filtro_notch_path = 0
 #Definicion de parametros
 FS = 500
 TAMANIO_BLOQUE_FILTRADO = 5
-UMBRAL_MINIMO = 20000#5000#50#1e-6
+UMBRAL_MINIMO = 0#5000#50#1e-6
 GANANCIA_ADS = 1
 CTE_HIPERBOLICA = 0.012#0.024#0.006
 PERIODO_REFRACTARIO = int(130e-3 * FS)
@@ -88,14 +88,15 @@ senial_umbral_micro = m2p.memoria2array_float32(senial_umbral_path)
 # ax0.legend()
 
 #Filtrarla
-#Sacamos la continua
-senial_filtrada_offline = filtfilt(b_hp, a_hp, senial_entrada)
-#Convertimos a entero, como esta en el micro
-senial_filtrada_offline = senial_filtrada_offline.astype(int)
-#Amplificamos
-senial_filtrada_offline = 10 * senial_filtrada_offline
+# #Sacamos la continua
+# senial_filtrada_offline = filtfilt(b_hp, a_hp, senial_entrada)
+# #Convertimos a entero, como esta en el micro
+# senial_filtrada_offline = senial_filtrada_offline.astype(int)
+# #Amplificamos
+# senial_filtrada_offline = 10 * senial_filtrada_offline
+senial_filtrada_offline = senial_entrada
 #Derivamos y sacamos ruido
-senial_filtrada_offline = filtfilt(b, a, senial_filtrada_offline)
+senial_filtrada_offline = lfilter(b, a, senial_filtrada_offline)
 #Convertimos a entero, como esta en el micro
 senial_filtrada_offline = senial_filtrada_offline.astype(int)
 senial_filtrada_offline = senial_filtrada_offline ** 2
@@ -132,12 +133,13 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
             contador_muestras_validas = 0
             
         #Filtrarla
-        #Sacamos la continua
-        senial_filtrada, zi_hp = filtrar(tramo_senial, filtro_hp, zi_hp)
-        #Convertimos a entero, como esta en el micro
-        senial_filtrada = senial_filtrada.astype(int)
-        #Amplificamos
-        senial_filtrada = 10 * senial_filtrada
+        # #Sacamos la continua
+        # senial_filtrada, zi_hp = filtrar(tramo_senial, filtro_hp, zi_hp)
+        # #Convertimos a entero, como esta en el micro
+        # senial_filtrada = senial_filtrada.astype(int)
+        senial_filtrada = tramo_senial
+        # #Amplificamos
+        # senial_filtrada = 10 * senial_filtrada
         #Derivamos y sacamos ruido
         senial_filtrada, zi = filtrar(senial_filtrada, filtro, zi)
         #Convertimos a entero, como esta en el micro
@@ -257,6 +259,7 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
 
 
 senial_filtrada = filtrar(senial_entrada, filtro)
+senial_filtrada_offline[0:350] = senial_integrada_final[0:350] = senial_umbral[0:350] = 0
 fig0, [ax0, ax1, ax2] = plt.subplots(3,1)
 #ax0.plot(senial_entrada, label='entrada')
 ax1.plot(senial_entrada, label='entrada')
