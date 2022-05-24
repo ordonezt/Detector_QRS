@@ -16,10 +16,10 @@ from scipy.signal import bode
 import mplcursors
 from scipy.signal import filtfilt, lfilter
 
-senial_path = 'Signals_ADS/N_sinus_20ppm_1mV'
+senial_path = 'Signals_ADS/R_wave_60ppm_05mV_80ms'
 senial_micro_path = 'Signals_ADS/R_wave_60ppm_05mV_80ms_micro'
 senial_umbral_path = 'Signals_ADS/R_wave_60ppm_05mV_80ms_umbral'
-filtro_qrs_path = 'Filtros/Diferenciador_FIR_orden3.csv'
+filtro_qrs_path = 'Filtros/Filtro_diferenciador_QRS_BESSEL_IIR.csv'
 filtro_pasa_altos_path = 'Filtros/Filtro_diferenciador_QRS_IIR.csv'
 filtro_notch_path = 0
 #Definicion de parametros
@@ -29,7 +29,7 @@ UMBRAL_MINIMO = 0#5000#50#1e-6
 GANANCIA_ADS = 1
 CTE_HIPERBOLICA = 0.012#0.024#0.006
 PERIODO_REFRACTARIO = int(130e-3 * FS)
-PERIODO_VALIDACION = int(10e-3 * FS)
+PERIODO_VALIDACION = int(30e-3 * FS)
 PERIODO_BUSQUEDA = int(50e-3 * FS)
 CANT_PROMEDIOS = 10
 
@@ -48,6 +48,12 @@ vector_integral = []
 muestras_desde_maximo = 0
 buscando_maximo_flag = False
 contador_muestras_maximo = 0
+
+dato_anterior = None
+
+x0 = 0
+x1 = 0
+x2 = 0
 
 #Señales auxiliares
 senial_filtrada_final = []
@@ -79,6 +85,8 @@ senial_entrada = m2p.memoria2array_int16(senial_path)
 senial_micro = m2p.memoria2array_float32(senial_micro_path)
 senial_umbral_micro = m2p.memoria2array_float32(senial_umbral_path)
 #senial_entrada = importar_senial_octave(senial_path)
+
+senial_entrada = senial_entrada[65:] - np.average(senial_entrada)
 
 # senial_filtrada = filtrar(senial_entrada, filtro)
 #senial_filtrada = senial_filtrada * senial_filtrada
@@ -150,14 +158,36 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
             #Extraemos un dato
             dato = escalar_senial(senial_filtrada[i], ganancia, GANANCIA_ADS)
             
+            try:
+                x0 = dato - dato_anterior
+            except:
+                dato_anterior = dato
+                x0 = 0
+            
+            # if ((x0 > 0) and (x1 > 0) and (x2 > 0)) or ((x0 < 0) and (x1 < 0) and (x2 < 0)):
+            #     y = abs(x0 * x1 * x2)
+            # else:
+            #     y = 0
+            
+            y = x0 * x1 * x2
+            if y < 0:
+                y = 0
+            
+            x2 = x1
+            x1 = x0
+            
             #Elevamos al cuadrado
             dato = dato ** 2
-            senial_cuadrada_final = np.append(senial_cuadrada_final, dato)
+            senial_cuadrada_final = np.append(senial_cuadrada_final, y)
+            
+            
             
             #Integramos
             agregar_y_desplazar(vector_integral, dato, CANT_PROMEDIOS)
             dato = promedio(vector_integral)
             senial_integrada_final = np.append(senial_integrada_final, dato)
+            
+            dato = y
             
             if buscando_maximo_flag == True:
                 contador_muestras_maximo = contador_muestras_maximo + 1
@@ -261,15 +291,15 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
 senial_filtrada = filtrar(senial_entrada, filtro)
 senial_filtrada_offline[0:350] = senial_integrada_final[0:350] = senial_umbral[0:350] = 0
 fig0, [ax0, ax1, ax2] = plt.subplots(3,1)
-#ax0.plot(senial_entrada, label='entrada')
+ax0.plot(senial_entrada, label='entrada')
 ax1.plot(senial_entrada, label='entrada')
-#ax0.plot(senial_filtrada_final, label='filtrada')
-#ax0.plot(senial_cuadrada_final, label='cuadrada')
+ax0.plot(senial_filtrada_final, label='filtrada')
+ax0.plot(senial_cuadrada_final, label='cuadrada')
 #ax0.plot(senial_bloqueo, label='bloqueo')
 ax0.plot(senial_umbral, label='umbral')
 #ax0.plot(senial_maximo, label='maximo')
-ax0.plot(senial_filtrada_offline, label='offline')
-ax0.plot(senial_integrada_final, label='integrada')
+#ax0.plot(senial_filtrada_offline, label='offline')
+#ax0.plot(senial_integrada_final, label='integrada')
 # ax0.stem(vector_maximos, label='maximos', markerfmt='-')
 #ax0.stem(vector_pulsos, label='pulsos', markerfmt='-')
 # ax0.plot(senial_micro, label='micro')
