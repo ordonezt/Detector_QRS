@@ -17,9 +17,9 @@ import mplcursors
 from scipy.signal import filtfilt, lfilter
 
 senial_path = 'Signals_ADS/R_wave_60ppm_05mV_80ms'
-senial_micro_path = 'Signals_ADS/R_wave_60ppm_05mV_80ms_micro'
+senial_micro_path = 'Signals_ADS/qrs_1mV'
 senial_umbral_path = 'Signals_ADS/R_wave_60ppm_05mV_80ms_umbral'
-filtro_qrs_path = 'Filtros/Filtro_diferenciador_QRS_BESSEL_IIR.csv'
+filtro_qrs_path = 'Filtros/Filtro_diferenciador_QRS_BESSEL_2_IIR.csv'
 filtro_pasa_altos_path = 'Filtros/Filtro_diferenciador_QRS_IIR.csv'
 filtro_notch_path = 0
 #Definicion de parametros
@@ -29,9 +29,10 @@ UMBRAL_MINIMO = 0#5000#50#1e-6
 GANANCIA_ADS = 1
 CTE_HIPERBOLICA = 0.012#0.024#0.006
 PERIODO_REFRACTARIO = int(130e-3 * FS)
-PERIODO_VALIDACION = int(30e-3 * FS)
+PERIODO_VALIDACION = int(18e-3 * FS)
 PERIODO_BUSQUEDA = int(50e-3 * FS)
 CANT_PROMEDIOS = 10
+PERIODO_BUSQUEDA_UMBRAL_MINIMO = int(1 * FS)
 
 #Variables globales
 maximo = 0
@@ -41,7 +42,7 @@ ganancia = 1
 muestras_desde_contacto = 0
 indice_global = 0           #Tiene el numero de muestra actual sobre el total
 indice_maximo_local = 0
-deteccion_bloqueada = 0
+deteccion_bloqueada = 50
 contador_muestras_validas = 0
 intervalo_entre_pulsos = 0
 vector_integral = []
@@ -55,6 +56,17 @@ x0 = 0
 x1 = 0
 x2 = 0
 
+u0 = u1 = u2 = 0
+
+maximo_local_anterior = 0
+contador_maximo_local = 0
+
+#Variables para calcular el umbral minimo en base al ruido
+acumulador_ruido = 0
+contador_ruido = 0
+umbral_minimo = 0
+busqueda_umbral_minimo = PERIODO_BUSQUEDA_UMBRAL_MINIMO
+
 #Señales auxiliares
 senial_filtrada_final = []
 senial_cuadrada_final = []
@@ -62,6 +74,8 @@ senial_integrada_final = []
 senial_umbral = []
 senial_maximo = []
 senial_bloqueo = []
+senial_umbral_minimo = []
+senial_maximo_local = []
 
 #Flags
 marcapasos_flag = False
@@ -139,6 +153,7 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
             maximo = 0
             umbral = UMBRAL_MINIMO
             contador_muestras_validas = 0
+            umbral_minimo = 0
             
         #Filtrarla
         # #Sacamos la continua
@@ -156,13 +171,13 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
         
         for i in range(TAMANIO_BLOQUE_FILTRADO):
             #Extraemos un dato
-            dato = escalar_senial(senial_filtrada[i], ganancia, GANANCIA_ADS)
+            u0 = escalar_senial(senial_filtrada[i], ganancia, GANANCIA_ADS)
             
-            try:
-                x0 = dato - dato_anterior
-            except:
-                dato_anterior = dato
-                x0 = 0
+            
+            x0 = u0 - u2
+            u2 = u1
+            u1 = u0
+
             
             # if ((x0 > 0) and (x1 > 0) and (x2 > 0)) or ((x0 < 0) and (x1 < 0) and (x2 < 0)):
             #     y = abs(x0 * x1 * x2)
@@ -170,20 +185,23 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
             #     y = 0
             
             y = x0 * x1 * x2
+            # print("dato = {}".format(dato))
+            # print("x0 = {}".format(x0))
+            # print("y = {}".format(y))
             if y < 0:
                 y = 0
             
             x2 = x1
             x1 = x0
             
-            #Elevamos al cuadrado
-            dato = dato ** 2
+            # #Elevamos al cuadrado
+            # dato = dato ** 2
             senial_cuadrada_final = np.append(senial_cuadrada_final, y)
             
             
             
             #Integramos
-            agregar_y_desplazar(vector_integral, dato, CANT_PROMEDIOS)
+            agregar_y_desplazar(vector_integral, y, CANT_PROMEDIOS)
             dato = promedio(vector_integral)
             senial_integrada_final = np.append(senial_integrada_final, dato)
             
@@ -222,7 +240,7 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
                 if contador_muestras_validas >= PERIODO_VALIDACION: 
                     
                     #Si la deteccion no estaba bloqueada hay que validar el pulso
-                    if deteccion_bloqueada == 0:
+                    if deteccion_bloqueada == 0 and busqueda_umbral_minimo == 0:
                         
                         #Reiniciamos el tiempo de la envolvente
                         # muestras_desde_contacto = indice_global - indice_maximo_local#0
@@ -238,6 +256,15 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
                         
                         #Bloqueamos la deteccion durante el periodo refractario
                         deteccion_bloqueada = PERIODO_REFRACTARIO
+                        
+                        try:
+                            umbral_minimo = acumulador_ruido / contador_ruido + umbral / 2
+                            acumulador_ruido = 0
+                            contador_ruido = 0
+                        except:
+                            acumulador_ruido = umbral/2
+                            contador_ruido = 1
+                            umbral_minimo = acumulador_ruido / contador_ruido + umbral / 2
                         
                         # #Recalculamos el umbral
                         # umbral = declinacion_hiperbolica(maximo, CTE_HIPERBOLICA, muestras_desde_contacto)
@@ -260,11 +287,29 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
             
             #Recalculamos el umbral
             umbral = declinacion_hiperbolica(maximo, CTE_HIPERBOLICA, muestras_desde_contacto)
-            if umbral < UMBRAL_MINIMO: umbral = UMBRAL_MINIMO
+            if umbral < umbral_minimo: umbral = umbral_minimo
             
             if deteccion_bloqueada == 0 and buscando_maximo_flag == False:
-                maximo_local = 0
+                # maximo_local = 0
+                if busqueda_umbral_minimo == 0:
+                    acumulador_ruido = acumulador_ruido + dato
+                    contador_ruido = contador_ruido + 1
+                    
+            if busqueda_umbral_minimo and deteccion_bloqueada == 0:
+                busqueda_umbral_minimo = busqueda_umbral_minimo - 1
+                acumulador_ruido = acumulador_ruido + dato
+                contador_ruido = contador_ruido + 1
+                if busqueda_umbral_minimo == 0:
+                    umbral_minimo = (acumulador_ruido / contador_ruido) * 1.1
+                    acumulador_ruido = 0
+                    contador_ruido = 0
+            
+            if maximo_local == maximo_local_anterior:
+                contador_maximo_local = contador_maximo_local + 1
+                if contador_maximo_local > 1000:
+                    maximo_local = 0
                 
+            maximo_local_anterior = maximo_local
             #Incrementamos el tiempo para la envolvente
             muestras_desde_contacto = muestras_desde_contacto + 1
             
@@ -283,6 +328,8 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
             senial_umbral = np.append(senial_umbral, umbral)
             senial_maximo = np.append(senial_maximo, maximo)
             senial_bloqueo = np.append(senial_bloqueo, 2500 * deteccion_bloqueada)
+            senial_umbral_minimo.append(umbral_minimo)
+            senial_maximo_local = np.append(senial_maximo_local, maximo_local)
             
             # if contador_muestras_validas != 0:
             #     print(contador_muestras_validas)
@@ -293,15 +340,17 @@ senial_filtrada_offline[0:350] = senial_integrada_final[0:350] = senial_umbral[0
 fig0, [ax0, ax1, ax2] = plt.subplots(3,1)
 ax0.plot(senial_entrada, label='entrada')
 ax1.plot(senial_entrada, label='entrada')
-ax0.plot(senial_filtrada_final, label='filtrada')
+# ax0.plot(senial_filtrada_final, label='filtrada')
 ax0.plot(senial_cuadrada_final, label='cuadrada')
 #ax0.plot(senial_bloqueo, label='bloqueo')
 ax0.plot(senial_umbral, label='umbral')
-#ax0.plot(senial_maximo, label='maximo')
+ax0.plot(senial_umbral_minimo, label='umbral minimo')
+ax0.plot(senial_maximo, label='maximo')
+ax0.plot(senial_maximo_local, label='maximo local')
 #ax0.plot(senial_filtrada_offline, label='offline')
 #ax0.plot(senial_integrada_final, label='integrada')
 # ax0.stem(vector_maximos, label='maximos', markerfmt='-')
-#ax0.stem(vector_pulsos, label='pulsos', markerfmt='-')
+# ax0.stem(vector_pulsos, label='pulsos', markerfmt='-')
 # ax0.plot(senial_micro, label='micro')
 # ax0.plot(senial_umbral_micro, label='umbral micro')
 #ax0.plot(vector_buscando_maximo, label='buscando')
