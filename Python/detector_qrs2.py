@@ -33,8 +33,8 @@ TAMANIO_BLOQUE_FILTRADO = 5
 UMBRAL_MINIMO = 0#5000#50#1e-6
 GANANCIA_ADS = 1
 CTE_HIPERBOLICA = 0.012#0.024#0.006
-PERIODO_REFRACTARIO     = int(140e-3 * FS)
-PERIODO_VALIDACION      = int(16e-3 * FS)
+PERIODO_REFRACTARIO     = int(150e-3 * FS)
+PERIODO_VALIDACION      = int(12e-3 * FS)
 PERIODO_BUSQUEDA_MAX    = int(50e-3 * FS)
 CANT_PROMEDIOS = 10
 PERIODO_BUSQUEDA_UMBRAL_MINIMO = int(1 * FS)
@@ -101,6 +101,8 @@ senial_maximo_local = []
 senial_umbral_superior = []
 senial_umbral_inferior = []
 senial_contador_ruido = []
+senial_derivada = []
+senial_modulo = []
 
 #Flags
 marcapasos_flag = False
@@ -204,13 +206,24 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
             #Extraemos un dato
             u0 = escalar_senial(senial_filtrada[i], ganancia, GANANCIA_ADS)
             
+            # if u0 < 0:
+            #     u0 = -u0
+            senial_modulo.append(u0)
+                
             x0 = u0 - u2
             u2 = u1
             u1 = u0
             
+            senial_derivada.append(x0)
             y = x0 * x1 * x2
             if y < 0:
                 y = 0
+            
+            # if (np.sign(x0) > 0) and (np.sign(x1) > 0) and (np.sign(x2) > 0):
+            #     y = x0 * x1 * x2
+            # else:
+            #     y = 0
+                
             x2 = x1
             x1 = x0
             
@@ -255,7 +268,7 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
                 elif contador_umbral_superior > 0:
                     contador_umbral_superior = contador_umbral_superior - 1
                 
-                if contador_umbral_inferior > PERIODO_VALIDACION:
+                if contador_umbral_inferior >= PERIODO_VALIDACION:
                     if contador_umbral_superior > 0:
                         #Pulso valido
                         #Cambiamos de estado avisando que sigue un periodo refractario
@@ -269,7 +282,9 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
                         acumulador_ruido = 0
                         contador_ruido = 0
                         vector_pulsos[indice_global] = senial_entrada[indice_global]
-                        print("maximo local {}".format(maximo_local))
+                        # print("maximo local {}".format(maximo_local))
+                
+                print("Contador umbral inferior: {}".format(contador_umbral_inferior))
                         
                     
             elif estado == ESTADO_ANALIZANDO:
@@ -337,21 +352,23 @@ fig0, [ax0, ax1] = plt.subplots(2,1)
 ax1.plot(senial_entrada, label='entrada')
 # ax0.plot(senial_filtrada_final, label='filtrada')
 ax0.plot(senial_cuadrada_final, label='cuadrada')
-ax0.plot(senial_bloqueo, label='bloqueo')
+# ax0.plot(senial_bloqueo, label='bloqueo')
 # ax0.plot(senial_umbral_superior, label='umbral superior')
 # ax0.plot(senial_umbral_inferior, label='umbral inferior')
-ax0.plot(senial_umbral_minimo, label='umbral minimo')
+# ax0.plot(senial_umbral_minimo, label='umbral minimo')
 # ax0.plot(senial_maximo, label='maximo')
 # ax0.plot(senial_maximo_local, label='maximo local')
 # ax0.plot(senial_filtrada_offline, label='offline')
 # ax0.plot(senial_integrada_final, label='integrada')
 # ax0.stem(vector_maximos, label='maximos', markerfmt='-')
-ax0.stem(vector_pulsos, label='pulsos', markerfmt='-')
+# ax0.stem(vector_pulsos, label='pulsos', markerfmt='-')
 # ax0.plot(senial_micro, label='micro')
 # ax0.plot(senial_umbral_micro, label='umbral micro')
 # ax0.plot(vector_buscando_maximo, label='buscando')
 ax1.stem(vector_pulsos, label='pulsos', markerfmt='-')
-ax0.plot(senial_contador_ruido, label='contador ruido')
+# ax0.plot(senial_contador_ruido, label='contador ruido')
+# ax0.plot(senial_derivada, label='derivada')
+# ax0.plot(senial_modulo, label='modulo')
 
 fft_original = fft(senial_entrada)
 fft_original[0] = 0+0j
