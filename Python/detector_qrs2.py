@@ -237,8 +237,8 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
             elif estado == ESTADO_BUSCANDO:
                 estado = ESTADO_BUSCANDO
                 
-                acumulador_ruido = acumulador_ruido + y
-                contador_ruido = contador_ruido + 1
+                # acumulador_ruido = acumulador_ruido + y
+                # contador_ruido = contador_ruido + 1
                 
                 if y > umbral_inferior:
                     contador_umbral_inferior = contador_umbral_inferior + 1
@@ -297,7 +297,11 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
                             flag_periodo_refractario = False
                             estado = ESTADO_BUSCANDO
                             
-              
+            
+            if contador_buscando_maximo == 0:
+                acumulador_ruido = acumulador_ruido + y
+                contador_ruido = contador_ruido + 1
+                
             #Esto se ejecuta en todos los estados:
             muestras_desde_contacto = muestras_desde_contacto + 1
             
