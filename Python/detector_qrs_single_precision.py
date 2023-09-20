@@ -14,7 +14,7 @@ from scipy.signal import bode
 import mplcursors
 from scipy.signal import filtfilt, lfilter
 
-senial_path         = 'Signals_ADS/ADS1292RandADS1198/filtrada_60ppm_2mV_10ms_micro_ads1198_5'
+senial_path         = 'Signals_ADS/ADS1292RandADS1198/entrada_250bpm_5mV_40ms_2'
 senial_micro_path   = 'Signals_ADS/ADS1292RandADS1198/procesada_250bpm_5mV_40ms_2'
 senial_umbral_path  = 'Signals_ADS/ADS1292RandADS1198/umbral_minimo_250bpm_5mV_40ms_2'
 filtro_qrs_path = 'Filtros/Filtro_diferenciador_QRS_BESSEL_2_IIR.csv'
@@ -157,8 +157,13 @@ senial_filtrada_offline = np.float32(senial_filtrada_offline)
 longitud_total = len(senial_entrada)
 
 #Creo un vector de eventos de pulsos
-vector_pulsos = np.zeros(longitud_total)
+vector_pulsos_procesada = np.zeros(longitud_total)
+vector_pulsos_entrada = np.zeros(longitud_total)
 vector_maximos = np.zeros(longitud_total)
+x_pulsos_procesados = []
+y_pulsos_procesados = []
+x_pulsos_entrada = []
+y_pulsos_entrada = []
 
 vector_buscando_maximo = np.zeros(longitud_total)
 
@@ -244,6 +249,12 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
                     umbral_minimo = CTE_UMBRAL_MINIMO * acumulador_ruido / contador_ruido
                     acumulador_ruido = 0
                     contador_ruido = 0
+                    
+                    x_pulsos_procesados.append(indice_global)
+                    y_pulsos_procesados.append(dato)
+                    x_pulsos_entrada.append(indice_global)
+                    y_pulsos_entrada.append(u0)
+                    
             
         elif estado == QRS_BLOQUEADO:
             if flag_periodo_refractario:
@@ -308,47 +319,28 @@ while indice_extraccion < (longitud_total - TAMANIO_BLOQUE_FILTRADO):
 
 
 senial_filtrada = filtrar(senial_entrada, filtro)
-fig0, [ax0, ax1, ax2] = plt.subplots(3,1)
-# ax0.plot(senial_entrada, label='entrada')
-ax1.plot(senial_entrada, label='entrada')
-# ax0.plot(senial_filtrada_final, label='filtrada')
+fig0, [ax0, ax1] = plt.subplots(2,1)
+
 ax0.plot(senial_procesada_final, label='procesada', drawstyle='steps-post')
-#ax0.plot(senial_bloqueo, label='bloqueo')
 ax0.plot(senial_umbral_superior, label='U+', drawstyle='steps-post')
 ax0.plot(senial_umbral_inferior, label='U-', drawstyle='steps-post')
 ax0.plot(senial_umbral_minimo, label='umbral minimo', drawstyle='steps-post')
-ax0.plot(senial_maximo, label='maximo')
-# ax0.plot(senial_maximo_local, label='maximo local')
-# ax0.plot(senial_filtrada_offline, label='offline')
-#ax0.plot(senial_integrada_final, label='integrada')
-# ax0.stem(vector_maximos, label='maximos', markerfmt='-')
-# ax0.stem(vector_pulsos, label='pulsos', markerfmt='-')
-# ax0.plot(senial_micro, label='micro', drawstyle='steps-post')
-# ax0.plot(senial_umbral_micro, label='umbral micro', drawstyle='steps-post')
-#ax0.plot(vector_buscando_maximo, label='buscando')
-ax1.stem(vector_pulsos, label='pulsos', markerfmt='-')
+ax0.plot(senial_maximo, label='maximo', drawstyle='steps-post')
+ax0.scatter(x_pulsos_procesados, y_pulsos_procesados, marker='x', c='red', label='detecciones')
 
-fft_original = fft(senial_entrada)
-fft_original[0] = 0+0j
-N = len(senial_entrada)
-freq = fftfreq(N, 1/FS)[:N//2]
-w, mag, phase = bode((b, a), w=freq)
+ax1.plot(senial_entrada, label='entrada', drawstyle='steps-post')
+ax1.scatter(x_pulsos_entrada, y_pulsos_entrada, marker='x', c='red', label='detecciones')
 
-ax2.plot(freq, 2.0/N * np.abs(fft_original[0:N//2]), label='entrada')
-ax2.plot(w, mag, label='filtro')
 
 fig0.suptitle(senial_path.split(sep='/')[-1] + '\n' + filtro_qrs_path.split(sep='/')[-1])
 ax0.legend()
 ax1.legend()
-ax2.legend()
 
 ax0.set_title('Procesamiento')
 ax1.set_title('Resultados')
-ax2.set_title('Espectro')
 
 ax0.grid(True)
 ax1.grid(True)
-ax2.grid(True)
 
 mplcursors.cursor()
 
